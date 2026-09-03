@@ -1,0 +1,15 @@
+# === AIScaffolding — append these to your repo's .gitignore ===
+
+# Isolated worktrees (CLAUDE.md §5.6). MUST be ignored before any worktree is
+# created here, or a full duplicate checkout can be committed into the repo.
+.worktrees/
+
+# The iterate-start/iterate-finish obligation ledger. Per-branch working notes;
+# never committed.
+.claude/dev-notes/
+
+# Machine-specific Claude Code settings and local permission grants.
+.claude/settings.local.json
+
+# Files install.sh/install.ps1 leaves behind when a target file already existed.
+*.aiscaffolding-new

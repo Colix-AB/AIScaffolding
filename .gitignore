@@ -1,0 +1,6 @@
+.DS_Store
+Thumbs.db
+*.aiscaffolding-new
+.worktrees/
+.claude/dev-notes/
+.claude/settings.local.json
