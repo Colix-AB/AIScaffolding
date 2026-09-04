@@ -87,7 +87,11 @@ Two that repay themselves quickly:
 
 ## 7. Set up the agents
 
-`.claude/agents/` holds seven roles. Point their bodies at your stack, narrow their tool lists, and add roles you need — remembering that **an agent nothing dispatches never runs**, so add it to the dispatch tables in `ship-issue` and `iterate-finish` too. See [`agents/README.md`](../template/.claude/agents/README.md).
+The flow dispatches seven roles, installed from [aitmpl.com](https://www.aitmpl.com/) rather than vendored here — the seven `npx claude-code-templates@latest --agent …` commands are in [`agents/README.md`](../template/.claude/agents/README.md).
+
+Installing them is step one; **adapting them is the step that matters.** The stock bodies name frameworks and commands that probably aren't yours, and none of them know about your wire casing, your isolation rule, or your parity gate. Point each body at your stack and at the skills that own the relevant contract, narrow the tool lists (a review agent needs read + search, not write), and commit the result — an agent that isn't checked in exists on one machine only. Re-running the install command overwrites your edits, so once adapted, treat the file as yours.
+
+Add roles you need (a `data-engineer`, a `mobile-developer`) and remember that **an agent nothing dispatches never runs** — add it to the dispatch tables in `ship-issue` and `iterate-finish` too.
 
 ---
 

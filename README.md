@@ -17,7 +17,7 @@ template/                     ← copy this into your repo
   completed.md                the shipped-behaviour ledger (template)
   .claude/
     settings.json             sanitized project settings
-    agents/                   7 specialist subagents the flow dispatches
+    agents/README.md          the 7 specialist subagents + their install commands
     skills/                   25 skills
 docs/
   the-flow.md                 how the flow works and why each step is where it is
@@ -38,11 +38,25 @@ cd AIScaffolding
 
 Then, in your repo:
 
-1. **Create the labels** (one command block — see [`docs/issue-tracking.md`](docs/issue-tracking.md)).
-2. **Fill in the placeholders.** `grep -rn "<[A-Z]" CLAUDE.md .claude/skills/` finds every decision the scaffold needs from you.
-3. **Rewrite `stack-conventions/SKILL.md`** for your stack. It's the one skill that must be yours.
-4. **Delete the gates that don't apply** — §8 if you have one host, the flag skills if you have no flag system. [`docs/customizing.md`](docs/customizing.md) walks the whole list.
-5. Try it: `create an issue for <something small>`, then `ship #<N>`.
+1. **Install the seven agents** the flow dispatches, from [aitmpl.com](https://www.aitmpl.com/):
+
+   ```bash
+   npx claude-code-templates@latest --agent development-team/backend-architect
+   npx claude-code-templates@latest --agent development-team/backend-developer
+   npx claude-code-templates@latest --agent development-team/frontend-developer
+   npx claude-code-templates@latest --agent development-tools/test-engineer
+   npx claude-code-templates@latest --agent development-team/ui-ux-designer
+   npx claude-code-templates@latest --agent development-tools/code-reviewer
+   npx claude-code-templates@latest --agent security/api-security-audit
+   ```
+
+   Then adapt them to your stack and commit them — see [`template/.claude/agents/README.md`](template/.claude/agents/README.md).
+
+2. **Create the labels** (one command block — see [`docs/issue-tracking.md`](docs/issue-tracking.md)).
+3. **Fill in the placeholders.** `grep -rn "<[A-Z]" CLAUDE.md .claude/skills/` finds every decision the scaffold needs from you.
+4. **Rewrite `stack-conventions/SKILL.md`** for your stack. It's the one skill that must be yours.
+5. **Delete the gates that don't apply** — §8 if you have one host, the flag skills if you have no flag system. [`docs/customizing.md`](docs/customizing.md) walks the whole list.
+6. Try it: `create an issue for <something small>`, then `ship #<N>`.
 
 ---
 
@@ -118,7 +132,7 @@ A few that carry more weight than their size suggests:
 - **`discuss-idea`** — read-only, cites `file:line`, argues against itself before finishing, and gives a **verdict**. "Here are four pros and four cons" is a non-answer.
 - **`resolve-merge-conflicts`** — resolve by **intent**, never by picking a side, and remember that a clean text merge is not a correct merge: the base may have added callers of a symbol your branch renamed, and that auto-merges with zero markers.
 
-And seven specialist agents the flow dispatches — `backend-architect`, `backend-developer`, `frontend-developer`, `test-engineer`, `ui-ux-designer`, `code-reviewer`, `api-security-audit`. The flow **only** dispatches agents defined in the project, because a global agent's instructions don't carry these gates.
+And seven specialist agents the flow dispatches — `backend-architect`, `backend-developer`, `frontend-developer`, `test-engineer`, `ui-ux-designer`, `code-reviewer`, `api-security-audit`. They aren't vendored here: install them from [aitmpl.com](https://www.aitmpl.com/) with the commands in [`template/.claude/agents/README.md`](template/.claude/agents/README.md), then **adapt them to your stack** — a stock `backend-developer` knows nothing about your wire casing or your isolation rule. The flow **only** dispatches agents defined in the project, because a global agent's instructions don't carry these gates.
 
 ---
 
@@ -152,4 +166,4 @@ If you change a skill, keep the shape: trigger-shaped description, the concrete 
 
 MIT — see [LICENSE](LICENSE).
 
-Two exceptions live in `template/.claude/agents/`: `ui-ux-designer.md` is CC BY 4.0 by [Madina Gbotoe](https://madinagbotoe.com/) (attribution required — keep the header block), and the remaining role prompts carry no authorship header. See [NOTICES.md](NOTICES.md).
+The scaffold vendors no third-party content. The seven subagents are installed from [aitmpl.com](https://www.aitmpl.com/) (the [`claude-code-templates`](https://github.com/davila7/claude-code-templates) CLI) and keep whatever licence and attribution their upstream template carries — some include an attribution header that must stay intact when you adapt the file.

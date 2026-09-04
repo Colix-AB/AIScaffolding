@@ -101,6 +101,8 @@ Use the built-in `/goal` slash command at the natural "keep working until X is t
 
 Delegate the heavy lifting of each step to the matching project-local subagent. **Only ever dispatch agents defined under `.claude/agents/`** — never a global/built-in agent type, whose instructions won't carry this project's gates. You stay the orchestrator: gate the issue, route each step to its agent, then verify the result against the gate before moving on.
 
+If one of these agents isn't present in `.claude/agents/`, say so rather than substituting a global one — [`.claude/agents/README.md`](../../agents/README.md) has the one-line install command for each.
+
 | Step | Agent | Use it for |
 | ---- | ----- | ---------- |
 | 2 Design contract | `backend-architect` | Service boundaries, schema, API-paradigm/contract decisions before code |

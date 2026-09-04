@@ -60,10 +60,21 @@ Write-Host ""
 Write-Host @"
 Next steps (see docs/customizing.md):
 
-  1. Create the issue labels:            docs/issue-tracking.md
-  2. Find every decision to make:        grep -rn "<[A-Z]" CLAUDE.md .claude/skills/
-  3. Rewrite for your stack:             .claude/skills/stack-conventions/SKILL.md
-  4. Delete the gates that don't apply:  CLAUDE.md section 8 (single host), the flag skills
-  5. Add to .gitignore:                  .worktrees/  and  .claude/dev-notes/
-  6. Try it:                             "create an issue for <something small>", then "ship #<N>"
+  1. Install the 7 agents the flow dispatches (from aitmpl.com), then adapt
+     them to your stack - details in .claude/agents/README.md:
+
+       npx claude-code-templates@latest --agent development-team/backend-architect
+       npx claude-code-templates@latest --agent development-team/backend-developer
+       npx claude-code-templates@latest --agent development-team/frontend-developer
+       npx claude-code-templates@latest --agent development-tools/test-engineer
+       npx claude-code-templates@latest --agent development-team/ui-ux-designer
+       npx claude-code-templates@latest --agent development-tools/code-reviewer
+       npx claude-code-templates@latest --agent security/api-security-audit
+
+  2. Create the issue labels:            docs/issue-tracking.md
+  3. Find every decision to make:        grep -rn "<[A-Z]" CLAUDE.md .claude/skills/
+  4. Rewrite for your stack:             .claude/skills/stack-conventions/SKILL.md
+  5. Delete the gates that don't apply:  CLAUDE.md section 8 (single host), the flag skills
+  6. Add to .gitignore:                  .worktrees/  and  .claude/dev-notes/
+  7. Try it:                             "create an issue for <something small>", then "ship #<N>"
 "@

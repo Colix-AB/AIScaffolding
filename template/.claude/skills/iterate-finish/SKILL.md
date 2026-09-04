@@ -148,7 +148,7 @@ git pull
 | 8 Security | `api-security-audit` | Any route, auth, or scoped write |
 | 8 UI review | `ui-ux-designer` | Screenshots of the changed screens — layout, states, a11y, consistency |
 
-Never dispatch a global/built-in agent type; only the ones defined under `.claude/agents/`. You stay the orchestrator: route each step, then verify the result against the gate yourself.
+Never dispatch a global/built-in agent type; only the ones defined under `.claude/agents/` — if one is missing, say so instead of substituting ([`.claude/agents/README.md`](../../agents/README.md) has the install commands). You stay the orchestrator: route each step, then verify the result against the gate yourself.
 
 ## Hard gates (all of them, now)
 
