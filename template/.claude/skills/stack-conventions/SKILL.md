@@ -50,6 +50,7 @@ middlewares/   → cross-cutting (auth, scope resolution, error handling)
 - **Styling:** use the project's one mechanism (`<utility classes | CSS modules | styled components>`). Don't mix in a second one; inline styles only for values computed at runtime.
 - **Async UI:** every async action sets a loading state and surfaces errors through the app's own dialog/toast system, never a native alert.
 - **Run the production build, not just the unit tests.** A non-existent named import passes unit tests and the dev server and then blanks the app — the build is what catches it.
+- **Keep the app entry's static import graph tiny.** One static import reachable from the root component can pull a whole runtime into the eager payload (a past chain of four imports added 1.5 MiB). Import heavy code dynamically, and read the bundle-size budget line of the production build.
 
 ## Tests
 
@@ -74,4 +75,7 @@ Every project accumulates a few of these. Keep the list short and current; each 
 - **A massive test-failure count is usually the environment, not your diff.** Classify the *first* error: a connection error means the database is down; a missing-module error means dependencies are stale. Fix that before reading code.
 - **Regenerate generated clients/types after pulling a schema change** — a stale generated client cascades into dozens of unrelated-looking failures.
 - **Run tests through the project's script, not the bare runner** — the script carries the env-file and config flags the tests need.
+- **A fired timer is the fact; the clock is not.** A Node `setTimeout` can fire while `Date.now()` is still a millisecond short of its target. Never decide *why* a timer-driven abort happened by re-reading the clock — ask the timer's own signal or flag (`signal.aborted`, a `fired` boolean). A past wait reported a timed-out call as user-cancelled, red on one nightly in several and never in its PR.
+- **A test hook returning a value may run it as teardown.** In Vitest, `beforeEach(() => mock.mockReset())` returns the mock, which then fires after each test. Use a block body: `beforeEach(() => { mock.mockReset(); })`.
+- **A module loaded through both `import` and `require()` can be two singletons** under a dev/test loader (e.g. tsx), while a compiled production build shares one. State set on one copy (a started worker, a registered hook) is missing from the other. Configure the copy callers actually reach, and pin it with a test that boots like the server entry.
 - **`<add yours here>`**

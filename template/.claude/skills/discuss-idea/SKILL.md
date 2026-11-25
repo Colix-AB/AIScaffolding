@@ -7,11 +7,12 @@ description: Apply when the user wants to think something through rather than ha
 
 This is the whiteboard conversation: the user wants to understand a piece of the system, or to find out whether an idea they have is a good one, *before* anyone opens an editor. The output is judgement, not a diff.
 
-Three things make that judgement worth having, and each is a way this conversation usually goes wrong:
+Four things make that judgement worth having, and each is a way this conversation usually goes wrong:
 
 1. **It's grounded in what the code actually does** — not in a plausible mental model of how a system like this probably works. A real codebase is large, mid-migration, and changes daily; a confident answer built on priors is worse than "give me a minute to read it", because the user can't tell the difference until it costs them.
 2. **It's an opinion.** "Here are four pros and four cons" is a non-answer. So is "great idea!". The user is asking because they want someone to tell them what they'd do.
-3. **It knows what's already settled.** Much of the design space is closed by the CLAUDE.md gates, by a skill that owns the contract, or by a call the team already made. Presenting a hard constraint as a tradeoff sends the user down a road that ends in a rejected PR.
+3. **It leads with the root cause (CLAUDE.md §7).** When a suggestion list holds both a fix for the cause and a fix for its symptom (route bloated input to a cheaper tier vs. stop the bloat), the cause comes first and the symptom fix is named as one, or dropped. Say which suggestions are gaps in work just shipped, so the user can tell new scope from unfinished scope.
+4. **It knows what's already settled.** Much of the design space is closed by the CLAUDE.md gates, by a skill that owns the contract, or by a call the team already made. Presenting a hard constraint as a tradeoff sends the user down a road that ends in a rejected PR.
 
 ## What this skill is (and is not)
 
@@ -39,10 +40,11 @@ Read the code the idea actually touches.
 - **Reason about `origin/main`, not the working tree.** The local checkout drifts and can be hundreds of commits stale; the user exercises what's on `main`. `git fetch origin` and read from `origin/main` before claiming a thing exists, doesn't exist, or has already shipped.
 - **Never cite a path inside a worktree directory.** `.worktrees/` holds full duplicate checkouts of in-flight branches, including stale twins of files that have since moved. An unscoped `grep -rn` from the repo root returns both copies, and the stale one reads exactly like a second implementation when it is only an older revision — so it can fake a §3 "two divergent paths" finding that doesn't exist. Scope searches to the real source directories.
 - **Measure the claim the recommendation rests on.** When one fact carries the whole verdict, don't infer it from reading nearby code — go count it. Grep every call site, count the models, check the commit that removed the thing, diff the two lists. Nearly every discussion that turns out to be wrong was wrong about one load-bearing fact that nobody checked, and checking is usually a single command.
+- **A step you hand the user to do in the UI is checked in the UI too.** The backend accepting an action proves nothing about the screen: the control may be disabled or hidden. Read the component (or the screenshot the user sent) before telling them to click it. A past answer told a user to delete an orphaned record through a panel whose delete button is disabled for exactly that case, although the API allowed it.
 - **Cite as `file.ts:120`.** A claim you can cite is worth something; a claim you can't is a guess, and it needs to be *labelled* a guess ("I'd expect… but I haven't checked"). The user will act on this, so the line between "I read it" and "I think" has to stay visible.
 - **Search directly; delegate only when the map is genuinely unknown.** Most questions here are answered by a few greps. Reach for a parallel search fan-out only when the question spans several subsystems *and* you don't yet know which files matter — and skip it whenever you could name the files yourself. A fan-out that comes back with what two greps would have found spends minutes and a lot of context to tell you nothing, and on a question the user asked conversationally that trade is simply bad.
 
-Also check [`completed.md`](../../../completed.md) and [`requirements.md`](../../../requirements.md) — the idea may already be shipped (✅), half-shipped with a named gap (🟡), or already specced as a requirement with a shape the user should build against.
+Also check [`completed/`](../../../completed/) and [`requirements/`](../../../requirements/) — the idea may already be shipped (✅), half-shipped with a named gap (🟡), or already specced as a requirement with a shape the user should build against. When you tell the user something already exists, say in the same sentence whether a flag gates it and whether production runs it (the flag registry; `git merge-base --is-ancestor <commit> <deployed release tag>`).
 
 ## Step 3 — Check what's already decided
 
@@ -56,12 +58,12 @@ Before weighing an idea, find out whether it's still open. Three places close it
 | **§7** no stopgaps | "For now we could just…" isn't a cheaper option — it's off the table. Price the real fix instead, even when it's bigger. |
 | **§8** multi-host parity | Any idea touching a shared component, layout container, nav chrome, the event layer, the data clients, or a wire shape costs **both hosts in the same PR**. "Web first, native later" is not a phasing option, so a two-host estimate is the only honest one. |
 | **§1** security | Default-deny auth and isolation aren't features to add later. An idea that opens a surface has to say who can reach it. |
-| **§2** the ledger | A functional change carries `completed.md` (and `requirements.md` when scope shifts). Fold that into the cost, don't discover it at PR time. |
+| **§2** the ledger | A functional change carries `completed/` (and `requirements/` when scope shifts). Fold that into the cost, don't discover it at PR time. |
 | **§5.5** dependent work ships as a GitHub stack | Work that "would be three stacked PRs" is priced as a real `gh stack` — each layer independently reviewable, tested, and ledgered, re-based every time `main` moves. Cheaper than a merge-then-branch wait, not free: say how many layers the idea really needs. |
 
-**A skill that owns the contract.** If the idea touches an env var, a capability list, a published package export, wire casing, a flag, or the API spec, the lockstep sites are already enumerated — read that skill and quote its checklist as the real cost rather than re-deriving it. See the §9 index in [CLAUDE.md](../../../CLAUDE.md).
+**A skill that owns the contract.** If the idea touches an env var ([`config-and-secrets`](../config-and-secrets/SKILL.md)), a capability list or a published package export ([`lockstep-contracts`](../lockstep-contracts/SKILL.md)), a flag ([`feature-flags`](../feature-flags/SKILL.md) / [`remove-feature-flag`](../remove-feature-flag/SKILL.md)), wire casing ([`wire-casing`](../wire-casing/SKILL.md)), or the API spec ([`openapi-contract`](../openapi-contract/SKILL.md)), the lockstep sites are already enumerated there — read it and quote its checklist as the real cost rather than re-deriving it.
 
-**A call the team already made.** Some designs have been proposed and rejected on purpose, and the reversal is usually recorded — a `completed.md` note that an earlier approach "was reverted in the same change that landed this", an issue that says why. Finding one of those is often the single most useful thing in the answer, because it replaces speculation with what happened when someone tried. If this exact shape was declined, say so and say why, rather than re-litigating it from scratch.
+**A call the team already made.** Some designs have been proposed and rejected on purpose, and the reversal is usually recorded — a `completed/` note that an earlier approach "was reverted in the same change that landed this", an issue that says why. Finding one of those is often the single most useful thing in the answer, because it replaces speculation with what happened when someone tried. If this exact shape was declined, say so and say why, rather than re-litigating it from scratch.
 
 ## Step 4 — Say what you actually think
 

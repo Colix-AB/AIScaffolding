@@ -1,0 +1,1 @@
+- REQ-FLAGS-05: Every flag key referenced in code is registered in the code registry, enforced by a bidirectional CI scan.

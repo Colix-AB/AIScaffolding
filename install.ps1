@@ -76,5 +76,7 @@ Next steps (see docs/customizing.md):
   4. Rewrite for your stack:             .claude/skills/stack-conventions/SKILL.md
   5. Delete the gates that don't apply:  CLAUDE.md section 8 (single host), the flag skills
   6. Add to .gitignore:                  .worktrees/  and  .claude/dev-notes/
+     Add to package.json scripts:        "ledger": "node scripts/ledger.mjs"
+     Wire into CI:                       npm run -s ledger -- --check
   7. Try it:                             "create an issue for <something small>", then "ship #<N>"
 "@

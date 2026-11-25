@@ -13,12 +13,13 @@ It was extracted from the working setup of a multi-tenant SaaS product built thi
 ```
 template/                     ← copy this into your repo
   CLAUDE.md                   the gates (§1–§8) + the skill index
-  requirements.md             the aspirational spec (template)
-  completed.md                the shipped-behaviour ledger (template)
+  requirements/               the aspirational spec, one file per requirement (template)
+  completed/                  the shipped-behaviour ledger, one file per entry (template)
+  scripts/ledger.mjs          prints either ledger as one document; --check enforces the layout
   .claude/
     settings.json             sanitized project settings
     agents/README.md          the 7 specialist subagents + their install commands
-    skills/                   25 skills
+    skills/                   35 skills
 docs/
   the-flow.md                 how the flow works and why each step is where it is
   skills-reference.md         every skill: when it applies, the rule that bites
@@ -94,21 +95,24 @@ Full walkthrough, with the reasoning for each step's position: [`docs/the-flow.m
 
 | § | Gate |
 | - | ---- |
-| **1** | **Production-ready or it doesn't merge** — security, scalability, maintainability on every change |
-| **2** | Functional changes update **`requirements.md`** (when scope shifts) **and `completed.md`**, in the same commit |
+| **1** | **Production-ready or it doesn't merge** — security, scalability, maintainability on every change; `preflight` runs the PR CI checks locally first, `pr-verify` confirms the PR isn't silently conflicted |
+| **1.5** | **Every paid API call is metered** against the tenant and quota-gated, or declares why not |
+| **2** | Functional changes update **`requirements/`** (when scope shifts) **and `completed/`**, in the same commit — one file per entry, so parallel PRs never conflict |
 | **3** | **Fix the root cause** — one behaviour, one implementation; never a second parallel path, and never "unify" by deleting capability |
 | **4** | One linter, and it's a **gate** — never hand-pick style |
 | **5** | **No AI attribution** in any commit, PR, or branch metadata |
 | **5.5** | Dependent work ships as a real **GitHub stack**, never a hand-retargeted base |
-| **5.6** | Worktrees live in **`.worktrees/`**, torn down once the PR opens; the primary checkout is the developer's |
+| **5.6** | Worktrees live in **`.worktrees/`**, torn down once the PR merges; created with `git worktree add`; the primary checkout is the developer's |
 | **6** | **Comments are a last resort** — ~10 words, the *why*, never the *what* |
+| **6.5** | **Internal identifiers** (issue numbers, REQ ids, internal jargon) never reach user-facing copy |
 | **7** | **Propose the real solution** — no stopgaps, no "good enough for now" |
-| **8** | **Multi-host parity in the same PR, or no ship** — a 🟡 "second host later" entry is forbidden |
+| **8** | **Multi-host parity in the same PR, or no ship** — a 🟡 "second host later" entry is forbidden; a reference host may lead only where the other host genuinely can't follow |
+| **8.6** | **Major features land in the user docs** in the same PR |
 
 The two documents are the memory that makes this work over months:
 
-- **`requirements.md`** — the aspirational spec. What the system *should* do, numbered permanently, larger than what's shipped.
-- **`completed.md`** — the ledger. What is *actually* implemented, ✅ / 🟡 / ❌, with file paths and test names as evidence — **and reversals recorded**, so nobody re-proposes a design the team already tried and backed out.
+- **`requirements/`** — the aspirational spec. What the system *should* do, numbered permanently, larger than what's shipped.
+- **`completed/`** — the ledger. What is *actually* implemented, ✅ / 🟡 / ❌, with file paths and test names as evidence — **and reversals recorded**, so nobody re-proposes a design the team already tried and backed out.
 
 ---
 
@@ -116,19 +120,23 @@ The two documents are the memory that makes this work over months:
 
 Full table with the rule that bites for each: [`docs/skills-reference.md`](docs/skills-reference.md).
 
-**Flow** — `github-issue` · `ship-issue` · `ship-issues` · `quick-fix` · `iterate-start` · `iterate-finish` · `discuss-idea`
+**Flow** — `github-issue` · `ship-issue` · `ship-issues` · `quick-fix` · `iterate-start` · `iterate-finish` · `discuss-idea` · `retrospective`
 
-**Standards** — `code-quality` · `stack-conventions` · `rest-api-design` · `relational-db-design` · `backend-endpoints` · `endpoint-security` · `openapi-contract` · `wire-casing` · `cross-host-parity` · `lockstep-contracts` · `pragmatic-dependencies` · `config-and-secrets`
+**CI gates** — `pr-preflight` · `fix-pr-checks` · `fix-nightly-tests` · `gh-stack-workflow`
+
+**Standards** — `code-quality` · `stack-conventions` · `rest-api-design` · `relational-db-design` · `backend-endpoints` · `endpoint-security` · `openapi-contract` · `wire-casing` · `cross-host-parity` · `lockstep-contracts` · `pragmatic-dependencies` · `config-and-secrets` · `paid-api-metering` · `design-system` · `docs-coverage`
 
 **Feature flags** — `feature-flags` · `remove-feature-flag`
 
-**Maintenance** — `using-git-worktrees` · `resolve-merge-conflicts` · `pr-maintenance` · `release-notes`
+**Maintenance** — `using-git-worktrees` · `resolve-merge-conflicts` · `pr-maintenance` · `release-notes` · `prioritize-ready-issues` · `find-code-smells`
 
 A few that carry more weight than their size suggests:
 
 - **`endpoint-security`** — auth is default-deny at *one* choke point; an anonymous route is an explicit allowlist entry with a written justification; every write is scoped **in the `where` clause**, not merely pre-checked; cross-scope probes 404 rather than 403. This exists because admin surfaces have shipped reachable to anonymous callers with a forged scope header.
 - **`wire-casing`** — one casing end to end, exactly one static mapping boundary, and **no runtime key-rewriter**. A recursive key-walker plus a denylist is what *causes* casing drift; reintroducing one is the forbidden regression.
 - **`lockstep-contracts`** — the generic pattern for any concept written down in more than one place (a permission list, a hand-walked entity allowlist, locale bundles, a registry the build scans). These drift silently: nothing fails to compile when a site is missed. Includes the trap where the last site isn't in the repo at all — it's a database row.
+- **`pr-preflight`** — one command runs the PR's CI checks locally, read straight from the workflow files, so a check added to CI is in preflight the same day. Most checks aren't *required*, so a red one merges and turns every later PR red; and a PR that conflicts with its base runs no checks at all — `pr-verify` catches that after every push.
+- **`retrospective`** — the closing step of every flow: each piece of friction becomes a one-line fix in the skill that should have prevented it, shipped as its own PR and logged so the improvement rate is measurable. Most of this scaffold's "this bit us" notes arrived that way.
 - **`discuss-idea`** — read-only, cites `file:line`, argues against itself before finishing, and gives a **verdict**. "Here are four pros and four cons" is a non-answer.
 - **`resolve-merge-conflicts`** — resolve by **intent**, never by picking a side, and remember that a clean text merge is not a correct merge: the base may have added callers of a symbol your branch renamed, and that auto-merges with zero markers.
 

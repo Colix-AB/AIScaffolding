@@ -53,17 +53,25 @@ Every issue this skill writes has a body with exactly these three sections, in t
 Rules for the content:
 
 - **Why** is the reason, not a restatement of the title. If you can't state a why, ask the user.
-- **Implementation** is a *suggestion* at altitude — 5–6 steps maximum. If it needs more, the issue is too big; suggest splitting it.
+- **Implementation** is a *suggestion* at altitude — 5–6 steps maximum. If it needs more, the issue is too big; suggest splitting it. **Every claim a step makes about the code is checked in the code first** — an unchecked claim becomes the implementer's wrong plan:
+  - **Every existing contract, surface, list or field a step names** (a response shape, an error code, a route, an export, a list it joins, a view it shows in) is grepped on `origin/main` to exist and to mean what the step assumes, failure behaviour included — never taken from an open PR's description. Grep what it already carries too: a past issue asked to show settings the screen already showed, and another put a finding in a list that only holds publish-blocking checks, where nothing rendered it. When it does not exist, say so, and either scope it in or file it.
+  - **A step that removes** copy, a control or a check first greps the tests and `completed/` for the decision that keeps it, then names that decision or drops the step. A past issue removed a sentence a test kept visible for keyboard users, and review put it back.
+  - **A step that adds entries to a curated list** (presets, catalogue items, options) greps the tests for bounds on the list's size and on every prompt or page that prints it, and fits its count inside them.
+  - **A new helper or module** names its existing home first: grep for one. A past issue proposed a module whose job an existing utility already did.
+  - **"The way X already does it"** traces X end to end, including retries and new rows.
+  - **A value the step persists, freezes or bounds** names the one place that owns it, then every reader and every surface where it can be set. A past issue put a minimum in one reader while other readers read the raw value and per-item overrides bypassed it.
+  - **A bug's cause from a production report** is named only after the data confirms it ([`ship-issue`](../ship-issue/SKILL.md) step 1). A past issue named a seeder that never wrote the reported row.
 - **Testing** says *what to check*, not how to write the test. Cover the happy path plus the obvious regression/edge case.
 - The **title** is a concise imperative ("Add X", "Fix Y") — rewrite a vague one.
 - **Feature-flag decision (every `type: feature`).** Decide whether the change ships dark behind a runtime feature flag (see [`feature-flags`](../feature-flags/SKILL.md)). *Flagged* when the change is user-visible and big or risky enough that a staged release matters — a new user-facing surface, a reworked flow, a behaviour change on a hot path, or work that will merge incomplete. *No flag* when it's small, low-risk, backend-internal, or trivially revertable. **Never add a flag without asking the user first** — the default is `no flag`; if you think one is warranted, ask one short question and wait. `flagged` names the key, which **must be lowercase-kebab and prefixed with the issue number** (`issue-<N>-<slug>`) so every flag traces back to what introduced it. Omit the line for `bug`/`chore`.
+- **A dependency names a real issue or PR number** (`Depends on #57`), checked to exist. Never "the X follow-up": a past issue depended on a follow-up nobody had filed, and its implementer had to search for it. Unfiled prerequisite work gets its own issue first.
 - Keep the whole body skimmable. No preamble, no "Background" essays, no checklists beyond the three sections.
 
 ### Project-specific decision lines
 
 Some projects need one more up-front call recorded on every feature, because it is expensive to retrofit. Add it as another one-line `**Label:**` entry after `**Flag:**`, and teach it to `ship-issue` step 0 and `iterate-start` step 2. Examples:
 
-- **`**Exposure:**`** — if your product has an agent/automation layer that composes features, record whether this feature is reachable by it (`exposed — <how it reaches the catalog/prompt/validator>` / `not exposed — <reason>`). A feature that must not leak into the automation surface asserts the opposite.
+- **`**Exposure:**`** — if your product has an agent/automation layer that acts for users, record whether this feature is reachable by it (`exposed — <how it reaches the catalog/prompt/validator>` / `not exposed — <which excluded category, and why>`). **Default to `exposed`**: anything a user can do in the app, both building blocks the agent composes and capabilities it performs (groups, sign-in, publishing, settings). Keep a short closed list of exclusions (platform-admin, billing, the user's own account and credentials, infra). A default of "only building blocks count" left whole capabilities unreachable by the agent, each by a judgement call nobody checked. Enforce it per route with a coverage test that fails on a route with no decision. A feature that must not leak into the automation surface asserts the opposite.
 - **`**Parity:**`** — if §8 applies, record which hosts the slice touches.
 - **`**Tier:**`** — if capabilities are gated by plan, record which tier gets it.
 
@@ -71,7 +79,7 @@ Keep it to at most two extra lines. Each one is a decision, not documentation.
 
 ## Steps
 
-1. **Gather input.** New issue → use the description. Refining → read the existing issue: `gh issue view <N> --json number,title,body,labels,assignees,state`. If you lack a clear *why*, ask the user one short question before writing. Ground the Implementation steps in the real codebase — a quick search for where the change lands beats a guess, and may reveal the work is already done.
+1. **Gather input.** New issue → use the description. Refining → read the existing issue: `gh issue view <N> --json number,title,body,labels,assignees,state`. If you lack a clear *why*, ask the user one short question before writing. Ground the Implementation steps in the real codebase — a quick search for where the change lands beats a guess, and may reveal the work is already done. **Read the code as it is on `origin/main`** (`git fetch` first, then `git grep … origin/main` / `git show origin/main:<path>`, or a fresh worktree), never the primary checkout, which can run far behind: a past issue was scoped against a checkout missing a whole epic that had landed in the same area, and had to be split before any code was written.
 2. **Draft the body** in the shape above. Trim the source down — do not copy long prose verbatim.
 3. **Write the issue:**
    ```bash

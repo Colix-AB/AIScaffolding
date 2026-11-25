@@ -1,0 +1,1 @@
+- REQ-FLAGS-04: The client bootstrap returns only the enabled keys for the caller's scope — never the catalog, the rules, or another tenant's state.

@@ -13,7 +13,7 @@ The repo ships a hand-authored OpenAPI document at `<path/to/canonical.openapi.y
 
 ## The rules
 
-- **When you add, change, or remove a route, update the canonical spec in the same PR.** This covers: a new path or verb; a changed request body or response envelope; a new/renamed/removed field; a changed status code; a new query parameter; a change to which auth schemes apply. The spec edit lands with the implementation, exactly like the `completed.md` ledger entry.
+- **When you add, change, or remove a route, update the canonical spec in the same PR.** This covers: a new path or verb; a changed request body or response envelope; a new/renamed/removed field; a changed status code; a new query parameter; a change to which auth schemes apply. The spec edit lands with the implementation, exactly like the `completed/` ledger entry.
 - **Field names in the spec are the on-the-wire names** — the project's declared casing ([`wire-casing`](../wire-casing/SKILL.md)), not the internal ORM identifier. **There is no case transform anywhere in the system**, so what the spec says is literally what travels. When in doubt, look at an actual response, not the model.
   - **Multipart exception.** Multipart bodies are not JSON, so multipart field names travel in whatever casing the controller reads them in — match the controller exactly. This is the one place the wire casing legitimately differs.
 - **Never hand-edit a generated spec.** To expose an operation externally, tag it in the canonical spec (`x-audience: external`); to hide it, remove the tag. Then run the generator and commit the regenerated file. Editing the generated file directly gets overwritten on the next build and flagged stale by CI.
@@ -28,6 +28,7 @@ A PR that touches a controller, route, or response shape must answer: **does the
 1. The path, verb, request body, response schema (including field names and the list envelope where the controller paginates), and status codes agree with the implementation.
 2. The derived/external file was regenerated if an externally-tagged operation changed.
 3. The validator passes.
-4. Each consuming client package was updated with a version bump.
+4. Each consuming client package was updated with a version bump. So was every **adapter that rebuilds the response field by field** (an agent/MCP tool, a BFF, an SDK wrapper): a new response field it does not name never reaches its consumer — a past tool dropped a new field and told its agent to proceed without the decision it needed.
+5. A request-only field sits on the request body, never on a component schema a response also composes. Grep the schema's `$ref`s before adding to it, or the response documents a field it never returns.
 
 A PR that changes API behaviour without updating the spec is **incomplete** and should be rejected.

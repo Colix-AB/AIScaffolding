@@ -1,6 +1,6 @@
 ---
 name: iterate-finish
-description: Apply when closing out local iterative work started with `iterate-start` — "finish this", "wrap it up", "open the PR for what we built", "ship what's on this branch". The closing half of the iterative pair: reconstructs the real scope from the diff, discharges every obligation the loop queued (backend tests, e2e, parity, API spec, docs, ledger), tidies the WIP history, runs code review + security audit + UI review, greens every gate, opens the PR, moves the issue to in-review, and returns the primary checkout to the branch it started on. Also usable to close out any local feature branch that skipped `iterate-start`.
+description: Apply when closing out local iterative work started with `iterate-start` — "finish this", "wrap it up", "open the PR for what we built", "ship what's on this branch". The closing half of the iterative pair: reconstructs the real scope from the diff, discharges every obligation the loop queued (backend tests, e2e, parity, API spec, docs, ledger), tidies the WIP history, runs code review + security audit + UI review, greens every gate, opens the PR and watches it until it merges, moves the issue to in-review, runs the retrospective, and returns the primary checkout to the branch it started on. Also usable to close out any local feature branch that skipped `iterate-start`.
 ---
 
 # Finish Iterative Work — Scope → Obligations → Tests → Review → Gates → PR
@@ -41,8 +41,10 @@ Walk the file list from step 1 and classify it. **This matrix, not the notes fil
 | A new `process.env.X` / config key | Dev template **and** the production provisioning ([`config-and-secrets`](../config-and-secrets/SKILL.md)) |
 | Localized copy or a locale | Every bundle a structural mirror of its source |
 | A user-facing flow | E2E spec covering the issue's Testing section, mutation-checked |
+| A call that spends money at a paid external API | Spend recorded against the calling account, the route gated, the unit priced or the owed price recorded ([`paid-api-metering`](../paid-api-metering/SKILL.md)) |
+| A major user-facing feature, or a change that makes the public docs wrong | Docs updated in every written locale, figures regenerated, a `Docs:` line in the PR — or `Docs: not needed — <reason>` ([`docs-coverage`](../docs-coverage/SKILL.md)). `flagged` → deferred to the flag-removal PR |
 | A `flagged` change | The flag gate with safe behaviour in the else branch, the flag created **OFF**, and tests covering **both** states |
-| A tracked requirement's behaviour | `completed.md` ✅ / 🟡 with evidence (and `requirements.md` if scope shifted) — §2 |
+| A tracked requirement's behaviour | `completed/` entry ✅ / 🟡 with evidence (and `requirements/` if scope shifted) — §2 |
 
 Print the derived list to the developer before working through it, so they can see what closing out involves.
 
@@ -76,28 +78,25 @@ The loop deferred these; they are due now, at full `ship-issue` strength.
 1. **Backend tests** (whenever the diff touches the server). Service logic gets unit tests; endpoints get DB-backed integration tests. Each endpoint test asserts the **wire contract** — the exact request body the controller reads, the response envelope and field names, the status codes — **and** the security posture (anonymous refused, cross-owner probe 404s). For a `flagged` change, cover both flag states. **Agent:** dispatch **`test-engineer`**.
 2. **E2E** (whenever the diff produced a user-facing flow) covering the issue's Testing section. Pin the request body/route shape where a contract is worth locking. **Mutation-check every new spec** — break the code deliberately and confirm the spec goes red; a spec that passes against broken code is worse than no spec. **Agent:** **`test-engineer`**.
 3. **Parity tests** (whenever a shared surface moved) — the generator-output tests pin the second host.
-4. **Register new test files.** If any suite in this repo uses an explicit file list, or a glob that a new file must match, verify the test **count actually went up**. A test file that never runs is the quietest possible failure.
+4. **Register new test files.** If any suite in this repo uses an explicit file list, or a glob that a new file must match, verify the test **count actually went up**. If CI selects tests from the diff's import graph, check the new test is reachable from a file the diff touches — otherwise it never runs on this PR. Never hand-add a file list to a workflow to force it. A test file that never runs is the quietest possible failure.
 
 ## Step 6 — Docs, contract and ledger
 
-- Discharge every documentation obligation from step 2 in this same PR: API-spec regen, package version + consumer docs, lockstep matrices, config template + production provisioning, locale bundles.
-- **Update [`completed.md`](../../../completed.md)** with ✅ / 🟡 plus evidence (file path, test name); a 🟡 carries its one-line gap. For a `flagged` change, name the flag key so the removal cleanup stays traceable. Update [`requirements.md`](../../../requirements.md) if the loop shifted scope. §2 — same commit as the implementation.
+- Discharge every documentation obligation from step 2 in this same PR: API-spec regen, package version + consumer docs, lockstep matrices, config template + production provisioning, locale bundles, the public docs ([`docs-coverage`](../docs-coverage/SKILL.md)).
+- **Update [`completed/`](../../../completed/)** — a new entry file, or an edit to the existing one — with ✅ / 🟡 plus evidence (file path, test name); a 🟡 carries its one-line gap. For a `flagged` change, name the flag key so the removal cleanup stays traceable. Update [`requirements/`](../../../requirements/) if the loop shifted scope. §2 — same commit as the implementation.
 - **§8 reminder:** a 🟡 "parity is a follow-up" is **forbidden** for a parity-affecting change. That is a blocked feature, not a partial one.
 
 ## Step 7 — Green every gate
 
-Run them all, and fix until they pass:
-
 ```bash
 <LINT FIX CMD>                   # repo root — §4, never hand-pick style
-<LINT CMD>                       # zero NEW warnings from this diff
-<API SPEC VALIDATE CMD>
-<FRONTEND BUILD CMD>             # catches a bad named import that unit tests and the dev server both miss
+<npm run preflight>              # the PR CI checks, run locally from the workflows
 ```
 
-- **The backend test set relevant to the diff** — the files you added or changed, plus the existing tests over each touched service/controller/route. Run the full suite only when the change is genuinely cross-cutting (a migration, the DB access layer, shared middleware, the error envelope, a casing sweep, generator output).
-- **The bar is zero NEW failures.** If `main` carries known pre-existing red and you cannot tell whose a failure is, prove it against BASE from the notes file — commit first, then `git switch --detach <BASE>`, run the identical file set, diff the failing test names, and `git switch -` back. Untracked files (deps, local config) survive the detach, so the environment is identical.
-- **The touched e2e specs**, green on two consecutive runs (flake is a failure).
+- **`<npm run preflight>` must end `0 failed`** — running it, re-running one check, and reading its failures are in [`pr-preflight`](../pr-preflight/SKILL.md). Clear new lint warnings your diff added, even on advisory steps.
+- **Don't run the whole backend suite on top.** Preflight runs CI's own test selection, which widens itself for cross-cutting changes; a hand-run full suite only adds load and flakes.
+- **The bar is zero NEW failures.** Prove inherited red per `pr-preflight`; if it is still unclear, prove it against BASE from the notes file — commit first, then `git switch --detach <BASE>`, re-run only the failing check, diff the failing test names, and `git switch -` back. Untracked files (deps, local config) survive the detach, so the environment is identical.
+- **The touched e2e specs**, green on two consecutive runs (flake is a failure). Run one heavy test process at a time; two concurrent suites on one machine manufacture timeouts.
 - **The [`endpoint-security`](../endpoint-security/SKILL.md) self-check**, one last time, whenever a route, service or schema moved.
 
 ## Step 8 — Review: code, security, UI
@@ -106,7 +105,7 @@ Dispatch these **in parallel** (they are independent) and **wait for all of them
 
 - **`code-reviewer`** over the full `origin/main...HEAD` diff — correctness, quality, maintainability.
 - **`api-security-audit`** whenever the diff touched a route, auth, or a scoped write.
-- **`ui-ux-designer`** whenever the diff touched a user-facing surface. Give it the real thing, not a description: run the app and capture screenshots of the changed screens and have it review layout, states, accessibility, and consistency with the surrounding product.
+- **`ui-ux-designer`** whenever the diff touched a user-facing surface. Give it the real thing, not a description: run the app and capture screenshots of the changed screens and have it review layout, states, accessibility, and consistency — judged against [`design-system`](../design-system/SKILL.md), which is binding, not taste.
 
 Fix every BLOCKER and every finding you agree with. Where you disagree, say why — do not silently drop it. Re-run the affected gate after each fix.
 
@@ -122,9 +121,10 @@ The loop's WIP commits are not a reviewable history.
 ## Step 10 — Open the PR and close the loop on the issue
 
 1. **PR against `main`** with `gh pr create --body-file <path>`. Title as the engineer; body = what changed, why, how it was verified (name the tests), and the parity evidence if a shared surface moved. Put **`Closes #<N>`** in exactly once; **reference every follow-up without a closing keyword** (`issue 45`, not `#45`) — a closing ref silently marks unshipped work as done.
-   - **Dependent work** (the notes file flagged an open-PR dependency): it goes into that branch's **GitHub stack** via `gh stack add` / `gh stack push` / `gh stack submit`, per §5.5 — never by hand-pointing the base at another feature branch.
-2. **Confirm CI is green** on the PR, and fix what it catches.
+   - **Dependent work** (the notes file flagged an open-PR dependency): it goes into that branch's **GitHub stack** via `gh stack add` / `gh stack push` / `gh stack submit`, per §5.5 and [`gh-stack-workflow`](../gh-stack-workflow/SKILL.md) — never by hand-pointing the base at another feature branch. Every layer opens **ready for review**, not draft: a draft layer blocks merging the stack. Merge-timing concerns go in the description.
+2. **`<npm run pr-verify>`**, then **watch the PR until it merges** — poll its checks in the background and act on every red check or new conflict ([`fix-pr-checks`](../fix-pr-checks/SKILL.md), [`resolve-merge-conflicts`](../resolve-merge-conflicts/SKILL.md)). A PR that conflicts with its base runs no checks and nothing reports it; "opened" is not "shipped". The watch loop is in [`pr-preflight`](../pr-preflight/SKILL.md).
 3. **Move the issue to `status: in-review`** and comment the PR link.
+4. **Retrospective.** Run [`retrospective`](../retrospective/SKILL.md) over the whole loop — obligations discovered late, failed gate runs, review findings, every correction the developer made — and state its outcome in the report. "No skill changes — <why>" is a valid outcome; skipping it is not.
 
 ## Step 11 — Return the checkout and retire the notes
 
@@ -153,9 +153,9 @@ Never dispatch a global/built-in agent type; only the ones defined under `.claud
 ## Hard gates (all of them, now)
 
 - **§1** Production-ready — security, scalability, maintainability, or it does not merge.
-- **§2** `completed.md` (and `requirements.md` if scope shifted) in the same commit.
-- **§3 / §7** One implementation per behaviour; root cause, no stopgap — the step-4 sweep is where the loop's shortcuts get paid off.
-- **§4** Lint clean; no new warnings.
+- **§2** `completed/` (and `requirements/` if scope shifted) in the same commit.
+- **§3 / §7** One implementation per behaviour; root cause, no stopgap — the step-4 sweep is where the loop's quick routes get paid off.
+- **§4** Lint clean; no new warnings. `<npm run preflight>` ends `0 failed`, and `<npm run pr-verify>` passes after every push.
 - **§5** No AI attribution anywhere in the commit, PR, or branch metadata.
 - **§5.5** Dependent work ships as a real `gh stack`, never a hand-retargeted base.
 - **§8** A parity-affecting change ships every host in this PR, with evidence. If it cannot, **do not open the PR** and do not mark it ✅.

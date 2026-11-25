@@ -1,0 +1,2 @@
+- 🟡 **REQ-<PREFIX>-02** — <What shipped.> `<path/to/impl>`.
+  - Gap: <the one thing that is missing>.

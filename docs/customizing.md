@@ -11,7 +11,7 @@ Work through this once, at adoption. It takes about an hour and it's the differe
 Everything in angle brackets is a decision. Find them all:
 
 ```bash
-grep -rn "<[A-Z][A-Z /|…-]*>" CLAUDE.md .claude/skills/ requirements.md completed.md
+grep -rn "<[A-Z][A-Z /|…-]*>" CLAUDE.md .claude/skills/ requirements/ completed/
 ```
 
 The ones that matter most, in order:
@@ -26,6 +26,8 @@ The ones that matter most, in order:
 | `snake_case` / `camelCase` | `wire-casing` | **The** casing decision, and where the one mapping boundary lives |
 | `<HOST A>` / `<HOST B>` | `CLAUDE.md` §8, `cross-host-parity` | Your two hosts — or delete the section (see 3) |
 | `<infrastructure-as-code>` | `config-and-secrets` | How production config and secrets are provisioned |
+| `<npm run preflight>` / `<npm run pr-verify>` | `CLAUDE.md` §1, `pr-preflight`, every delivery flow | The local run of your PR CI checks, and the post-push "not conflicted, checks started" probe (see 6) |
+| `<docs/production-config.md>` | `CLAUDE.md` header | Where the snapshot of operator-edited production values lives — or delete the rule if you have none |
 
 **`stack-conventions/SKILL.md` is the one skill you must rewrite**, not just fill in. It declares your layering, idioms, state locations, and test patterns. Keep it short — a convention nobody can recite isn't a convention.
 
@@ -82,6 +84,11 @@ Two that repay themselves quickly:
 
 - **A bidirectional registry scan** for flag keys (or any registry): fails on a call site with no entry *and* an entry with no call site. This is what makes atomic removal possible.
 - **A spec-staleness check** that fails when a generated spec doesn't match its canonical source.
+- **The ledger layout check**: add `"ledger": "node scripts/ledger.mjs"` to your root `package.json`, run `npm run -s ledger -- --check` in the lint job, and run `scripts/lib/__tests__/ledger.test.mjs` with your node tests.
+
+Then build **`<npm run preflight>`**: one command that reads your CI workflow files and runs the PR jobs' steps locally, ending in a `N passed, M failed` summary. Reading the workflows (instead of keeping a second list) is what keeps it honest — a check added to CI is in preflight the same day. Pair it with **`<npm run pr-verify>`**, which asks GitHub whether the PR is `CONFLICTING` and whether its checks actually started; a conflicted PR runs no checks and reports nothing. The [`pr-preflight`](../template/.claude/skills/pr-preflight/SKILL.md) skill describes both.
+
+**Unrequired checks still break `main`.** Most CI checks are not required by branch protection, so a red one merges. Either make them required or treat a red one as a blocker in review — preflight exists because the project this came from let several merge red.
 
 ---
 
@@ -97,9 +104,9 @@ Add roles you need (a `data-engineer`, a `mobile-developer`) and remember that *
 
 ## 8. Seed the two documents
 
-`requirements.md` and `completed.md` start as templates. Don't backfill your entire history — that's a week of archaeology nobody reads.
+`requirements/` and `completed/` start as templates — one directory per area, one file per entry, so parallel PRs never conflict on them. Don't backfill your entire history — that's a week of archaeology nobody reads.
 
-Instead: **write the REQ areas** (the `##` headings with their prefixes) for the whole product now, since the numbering is permanent, and then let `completed.md` fill in from the first change you ship through the flow. Add historical entries only where a reader would otherwise re-litigate something — particularly **reversals**: "we tried X and backed it out because Y" is the highest-value line in the file.
+Instead: **write the REQ areas** (the `##` headings with their prefixes) for the whole product now, since the numbering is permanent, and then let `completed/` fill in from the first change you ship through the flow. Add historical entries only where a reader would otherwise re-litigate something — particularly **reversals**: "we tried X and backed it out because Y" is the highest-value line in the file.
 
 ---
 
@@ -108,4 +115,5 @@ Instead: **write the REQ areas** (the `##` headings with their prefixes) for the
 The failure mode for a scaffold like this isn't rejection, it's decoration: the files stay, and the flow quietly stops being followed. Two habits prevent it.
 
 - **When a skill is wrong, fix the skill.** A skill that describes a path the code no longer has is worse than no skill, because it will be followed.
+- **Run a retrospective at the end of every delivery flow.** The [`retrospective`](../template/.claude/skills/retrospective/SKILL.md) skill turns each session's real friction (a failed check, a review finding, a correction) into a one-line fix in the skill that should have caught it, and logs it in `docs/retrospectives/` so the improvement rate is measurable. This is how the scaffold you are reading kept getting better.
 - **When something bites you twice, write it down** — in the skill that owns it, in one tight line. The most valuable content in this scaffold is the "this specific thing has bitten us" notes, and they only exist because someone added them the second time.
