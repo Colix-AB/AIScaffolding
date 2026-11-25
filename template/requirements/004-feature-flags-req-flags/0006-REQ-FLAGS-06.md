@@ -1,0 +1,1 @@
+- REQ-FLAGS-06: A flag is temporary. Once fully rolled out, the gate, the registry entry, and the runtime row are all removed.

@@ -56,7 +56,14 @@ Two failure modes to recognise rather than debug as code bugs:
 - **A missing module** usually means `origin/main` added a dependency that the local install predates — install, don't investigate.
 - **A connection error** to the database means the local database isn't running — start it.
 
-Some ecosystems resolve dependencies upward from a parent directory and need no install at all; others need a real copy. **Never symlink the primary checkout's dependency directory into a worktree** — `git worktree remove` follows the link and deletes the original.
+**A repo with several packages needs one install per package, not one at the root.** Without a workspace tool, a root install alone leaves the gates red for setup reasons — a test runner "not found", a bundler package missing — and that costs a whole `<npm run preflight>` run to discover. Before the first gate run, install in every package directory the gates touch (each with its own lockfile command; a package with no lockfile needs the non-lockfile install CI uses for it), and copy the gitignored `.env` from the primary checkout:
+
+```bash
+for dir in . <package dirs>; do (cd "$dir" && <install command>); done
+cp "$(git rev-parse --path-format=absolute --git-common-dir)/../<path>/.env" <path>/.env
+```
+
+Some ecosystems resolve dependencies upward from a parent directory and need no install at all; others need a real copy. **Never symlink the primary checkout's dependency directory into a worktree** — `git worktree remove` follows the link and deletes the original, and a clean install (`npm ci`) run through the link empties the developer's own install. A symlinked root dependency directory can also be committed by `git add -A`, because a directory-only ignore rule (`node_modules/`) does not match a symlink.
 
 ## Prove a clean baseline BEFORE changing anything
 

@@ -62,7 +62,7 @@ For each remaining PR (number `N`, head branch `B`, base `BASE` — usually `mai
 | Pure additive code conflicts where both sides added distinct new lines in the same region with no overlap | Keep both, base-side first. |
 | Whitespace-only or formatting-only conflicts | Prefer the PR side. |
 | Separate **new** migration files (both sides added a NEW file, neither edited the other's) | Keep both files. **Never merge two migrations into one.** |
-| `completed.md`, `requirements.md` | Treat as additive docs — keep both sides' entries, base-side first. |
+| `completed/`, `requirements/` | One file per entry, so a conflict means both sides edited the **same** entry: keep the base's text and graft in the branch's addition; never drop either side's line. A branch still editing a retired single-file ledger is ported as [`resolve-merge-conflicts`](../resolve-merge-conflicts/SKILL.md) describes. |
 
 4. Refuse to resolve — `git merge --abort`, post a PR comment, move on — when **any** conflicted file is:
    - the database schema (model/table bodies),
@@ -77,9 +77,9 @@ For each remaining PR (number `N`, head branch `B`, base `BASE` — usually `mai
 
 5. After a successful resolution:
    - Run the linter's fix command at the repo root. Must exit 0.
-   - If any server file was touched by the merge, run the backend suite. Must exit 0.
-   - If lint or tests fail, `git merge --abort` (or reset the worktree), post a PR comment with the failing command's last 30 lines of output, move on.
-   - On success: `git push origin "HEAD:$B"`. **Never** `--force` or `--force-with-lease`. Post one comment: ``Resolved conflicts in `<files>`. Lint+tests green. Pushed `<sha>`.``
+   - Run `<npm run preflight>` at the repo root ([`pr-preflight`](../pr-preflight/SKILL.md)) — the PR's CI checks, run locally. A hand-picked "backend suite if a server file changed" misses the checks a merge actually breaks (generated spec drift, a lint rule, a test selected from another package). Must end `0 failed`, apart from failures the latest `main` run of the same workflow also has.
+   - If lint or preflight fails, `git merge --abort` (or reset the worktree), post a PR comment with the failing command's last 30 lines of output, move on.
+   - On success: `git push origin "HEAD:$B"`, then `<npm run pr-verify> <N>`. A failure there means the push did not unblock the PR (still conflicting, or checks never started), so report that instead of the success comment. **Never** `--force` or `--force-with-lease`. Post one comment: ``Resolved conflicts in `<files>`. Lint+preflight green. Pushed `<sha>`.``
 
 ### Action B — Respond to unaddressed review comments
 

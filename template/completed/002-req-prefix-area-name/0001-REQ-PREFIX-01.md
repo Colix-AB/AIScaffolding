@@ -1,0 +1,1 @@
+- ✅ **REQ-<PREFIX>-01** — <What shipped, in one or two sentences, in the past tense.> `<path/to/impl>`; test `<path/to/test>`.

@@ -13,6 +13,14 @@ gh label create "status: needs-refinement" --color EEEEEE --description "Not yet
 gh label create "status: ready"            --color 1D76DB --description "Refined — ready for development"
 gh label create "status: in-progress"      --color FBCA04 --description "Being built now"
 gh label create "status: in-review"        --color 5319E7 --description "A PR is open"
+
+# Only if you run prioritize-ready-issues:
+gh label create "priority: highest" --color B60205 --description "At most 5 at a time"
+gh label create "priority: high"    --color D93F0B --description "At most 10 at a time"
+gh label create "priority: medium"  --color FBCA04
+gh label create "priority: low"     --color C2E0C6
+gh label create "priority: lowest"  --color EEEEEE
+gh label create "priority-locked"   --color 000000 --description "Set by a human; the ranking routine leaves it"
 ```
 
 **Done is `closed`**, not a label — the merged PR closes the issue.

@@ -83,7 +83,7 @@ A PR that changes a `PUT`-replaceable resource without keeping this guard curren
 ## Bulk & Performance
 
 - Don't N+1: if a client needs 100 children, return them embedded or expose `?include=children` instead of forcing 100 round-trips.
-- Heavy list endpoints return **summary projections** (id, name, slug); the full payload comes from `GET /:id`. Match the pattern the codebase already uses rather than inventing a second one (§3).
+- Heavy list endpoints return **summary projections** (id, name, slug); the full payload comes from `GET /:id`. Match the pattern the codebase already uses rather than inventing a second one (§3). **A field the summary leaves out is absent, never an empty default**, and not `required` in the spec. Clients read absent as "not known yet" and fetch the single resource before offering an action that depends on it — a past editor read a missing "used by" list as `[]` and offered Remove on a resource that was still in use.
 - Cap any list endpoint with a default and max page size.
 
 ## Quick checklist for any new endpoint

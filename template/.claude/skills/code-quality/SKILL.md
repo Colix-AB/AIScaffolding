@@ -74,5 +74,6 @@ When you edit a block whose comment is a stale paragraph, tighten it as you go (
 - [ ] No copy-pasted blocks > 5 lines without justification.
 - [ ] Names read like prose; no abbreviations the team can't pronounce.
 - [ ] Errors are handled or propagated — never silently caught.
+- [ ] A refactor that gives a split-out step its own state (a list, a report) keeps every `catch`/`finally` that read the old shared state seeing what already landed — a compensation reading the wrong copy undoes work that stays.
 - [ ] No `TODO` left without an owner or issue.
 - [ ] Tests cover the new behaviour, including at least one negative case.

@@ -1,0 +1,1 @@
+- REQ-FLAGS-03: A flag can be targeted off, on, by an explicit list of tenants, or by a deterministic percentage ramp; a per-tenant override wins over the mode.

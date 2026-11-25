@@ -1,0 +1,1 @@
+- REQ-FLAGS-02: Flag evaluation has one code path, never throws, and resolves to `false` on a cold miss — so the un-flagged branch must always be the known-good behaviour.

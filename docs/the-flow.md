@@ -11,7 +11,7 @@ Everything else is scheduling. These are the gates:
 | § | Gate | Enforced by |
 | - | ---- | ----------- |
 | 1 | Production-ready — security, scalability, maintainability | `endpoint-security`, `code-quality`, review agents |
-| 2 | Functional changes update `requirements.md` + `completed.md` | flow step "Ledger" |
+| 2 | Functional changes update `requirements/` + `completed/` | flow step "Ledger" |
 | 3 | Fix the root cause; one behaviour, one implementation | `discuss-idea`, the §3 sweep in `iterate-finish` |
 | 4 | One linter, and it's a gate | flow step "Gates" |
 | 5 | No AI attribution in VCS metadata | every flow's commit step |
@@ -112,7 +112,7 @@ The mechanism that makes deferral safe. When a loop step touches something in th
 | A published package interface | Semver bump + docs + every mirrored copy |
 | A new env var | Dev template + production provisioning |
 | A user-facing flow | E2E spec, mutation-checked |
-| A tracked requirement | `completed.md` (+ `requirements.md` if scope shifted) |
+| A tracked requirement | a `completed/` entry (+ a `requirements/` file if scope shifted) |
 
 `iterate-finish` takes the **union** of that list and the matrix it derives from the real diff, and discharges all of it.
 
@@ -122,13 +122,13 @@ The mechanism that makes deferral safe. When a loop step touches something in th
 
 A typo, a wrong constant, a casing slip, a CSS nudge, a missing null-check. Locate → root-cause fix → test the touched code → green the gates, in a worktree.
 
-**It escalates.** The moment a contract, wire shape, widget/shared surface, or auth rule is in play, `quick-fix` hands off to `ship-issue`. That escape hatch is the whole reason the slim path is safe to have.
+**It escalates.** The moment a contract, wire shape, shared surface, or auth rule is in play, `quick-fix` hands off to `ship-issue`. That escape hatch is the whole reason the slim path is safe to have.
 
 ## Path D — think first: `discuss-idea`
 
 Read-only. Grounds every claim in the real code with `file:line` citations, checks the idea against the gates and against decisions already made and reverted, gives a **verdict** rather than a both-sides list, prices it concretely — then hands off to `github-issue` / `ship-issue` / `quick-fix` only when the user says to build it.
 
-Its most useful move is finding that a design was already tried and backed out. That's why `completed.md` records reversals.
+Its most useful move is finding that a design was already tried and backed out. That's why `completed/` records reversals.
 
 ---
 

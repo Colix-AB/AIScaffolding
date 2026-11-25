@@ -32,6 +32,15 @@ That contract only holds if both sides stay in lockstep with the code. **Any PR 
 
 - **Never commit a real value.** The template carries placeholders only. Verify with a secret scan before pushing; if a real credential ever lands in history, rotating it is the fix, not deleting the line.
 
+## Shipping configuration and infrastructure changes
+
+- **A green staging deploy proves the build, not the fix.** Check that the version the environment serves (a `/version.json` or build-id endpoint) contains your merge commit (`git merge-base --is-ancestor <merge-sha> <served-sha>` after a fetch), then check the fix itself there and report what you observed.
+- **Write the rollout in the PR when no workflow applies it.** If infrastructure-as-code is applied by hand, a merged change does nothing until someone applies it. Say: staging first, what to check, and any step the tool cannot do (a component that must be upgraded one minor version at a time).
+- **Upgrading a cluster component (chart or image): read every intermediate release's notes, not only the target's.** Read the "breaking" / "by default" lines in full for each minor in between — a grep truncated with `head` misses them. A past ingress-controller upgrade turned on strict path validation that would have rejected dotted paths (`/robots.txt`) and dropped every customer custom domain.
+- **Check each changed default against objects the app creates at runtime.** A manifest fix does not reach resources the application itself creates and never updates; the upgrade has to keep those valid.
+- **Replacing a stateful service: switch clients in a separate step.** Build the new instance beside the old, copy its state first (for a message broker, the exported definitions so every durable queue exists), then flip the connection string with its own variable. Flipping it in the apply that creates the instance gives a window of lost publishes while pods restart.
+- **Resizing CI runners changes the tests, not only the queue.** A container reserves a CPU request, but the runtime's core count (`os.availableParallelism()`, `nproc`) reports every core of the *node*, so a test runner that sizes its workers from cores grows with the node type — a past node-type change took backend shards from three to seven files at once on a ~1-CPU pod and turned a third of runs red. Before the change, grep CI for core-derived worker counts and pin them. Before raising a pool's maximum, read the cloud account's quota: a ceiling above quota fails every scale-up at runtime.
+
 ## Reviewer checklist
 
 A PR that adds a new environment variable without updating **both** the dev template and the production provisioning (when applicable) is **incomplete** and should be rejected — either a fresh dev environment is missing the documented entry, or the next production deploy fails to boot or silently runs with an insecure default.

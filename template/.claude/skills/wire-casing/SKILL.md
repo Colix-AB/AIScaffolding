@@ -41,7 +41,7 @@ Renaming hundreds of physical columns means a large, risky data migration for ze
 
 ## How it's verified
 
-The authoritative gate is the **DB-backed integration suite**. It catches exactly the failures grep cannot: a write keyed on the wrong case lands nowhere (row count 0), a read returns undefined, a delete whose `where` doesn't match leaves stale rows. **A static grep for the wrong casing is not a sufficient check** — it cannot tell a genuine ORM/wire miss from a correctly-divergent internal argument or vendor field.
+The authoritative gate is the **DB-backed integration suite** — run the integration tests over the routes and services you touched; the PR's CI runs the diff's whole selection. It catches exactly the failures grep cannot: a write keyed on the wrong case lands nowhere (row count 0), a read returns undefined, a delete whose `where` doesn't match leaves stale rows. **A static grep for the wrong casing is not a sufficient check** — it cannot tell a genuine ORM/wire miss from a correctly-divergent internal argument or vendor field.
 
 If you run a codemod to sweep casing: **put the skip-list inside the codemod, not in your head.** Re-running it after merging `main` will otherwise silently re-convert the islands you reverted by hand. Re-run an invariant scan after every merge.
 

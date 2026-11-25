@@ -5,7 +5,7 @@ description: Apply when creating or updating any backend endpoint, route, contro
 
 # Backend Endpoint Requirements (REQ-GEN)
 
-These are the general, non-negotiable rules every backend endpoint must satisfy. They come from the **REQ-GEN** block of [`requirements.md`](../../../requirements.md) — keep the two in sync; this skill is the operational checklist. [`rest-api-design`](../rest-api-design/SKILL.md) covers URL/verb/status-code shape; [`relational-db-design`](../relational-db-design/SKILL.md) covers schema, indexes, and migrations; [`endpoint-security`](../endpoint-security/SKILL.md) is the security bar.
+These are the general, non-negotiable rules every backend endpoint must satisfy. They come from the **REQ-GEN** block of [`requirements/`](../../../requirements/) — keep the two in sync; this skill is the operational checklist. [`rest-api-design`](../rest-api-design/SKILL.md) covers URL/verb/status-code shape; [`relational-db-design`](../relational-db-design/SKILL.md) covers schema, indexes, and migrations; [`endpoint-security`](../endpoint-security/SKILL.md) is the security bar.
 
 ---
 
@@ -17,13 +17,16 @@ These are the general, non-negotiable rules every backend endpoint must satisfy.
 ## REQ-GEN-02 — ORM-only database access
 
 - All database interaction goes through the ORM. Raw SQL is permitted **only** when an ORM query is demonstrably insufficient for a performance-critical operation, and the reason is documented at the call site.
-- When a raw query is unavoidable (dynamic identifiers), the dynamic fragment **must** come from a fixed allowlist defined in the same file — never from a request field. (SQL-injection gate — [`endpoint-security`](../endpoint-security/SKILL.md).)
+- When a raw query is unavoidable (dynamic identifiers), the dynamic fragment **must** come from a fixed allowlist defined in the same file — never from a request field. (SQL-injection gate — [`endpoint-security`](../endpoint-security/SKILL.md).) Prefer the ORM's tagged-template raw query, which binds every interpolation.
+- **A new import can compile, pass every unit test, and still stop the server booting.** Module-resolution differences between the test loader and the production runtime (an ESM value import of a generated ORM client, for one) surface only at startup — this broke a smoke environment twice in one stack of PRs. After adding an import of generated or dual-format code, run a module-load check of the app entry (`node -e "import('./src/app')"` or equivalent).
 
 ## REQ-GEN-03 — Filter / sort / paginate at the database
 
 - Do all filtering, sorting, and pagination **in the query**, never in application memory.
 - Application code must never fetch a full table and post-filter — that is both a scalability failure (§1) and a correctness risk under scoping.
 - Every column you filter or sort on is backed by an index; compound filters get a composite index.
+- **A polled read gains no query for display.** An endpoint a client polls (a build status every second or two, per open tab) gets names and labels from data stamped when the row was written, not from a lookup per poll. A past first draft listed every table and column on each poll.
+- **Hot-path cost has a consumer.** Extra reads added to every write (a hydrated before-image, an enriched event field) run only when something consumes them. Gate them on one indexed existence check for that consumer — a past change added a second hydration to every record edit before review gated it on an enabled subscriber.
 
 ## REQ-GEN-04 — Versioned migrations
 
@@ -36,6 +39,8 @@ These are the general, non-negotiable rules every backend endpoint must satisfy.
 - Every error response is JSON with `statusCode`, `message`, and an optional `errors` array (plus an optional machine-readable `code`). **Produce it through one shared helper** so the shape cannot drift.
 - Errors **never leak internals** — no stack traces, file paths, or SQL fragments.
 - Cross-scope probes return **404, not 403**.
+- **A deliberate 4xx is thrown through the one shared coded-error helper** (`{ code, message, statusCode }`, named arguments). Never write a local `httpError` / `_err`: positional copies swap `code` and `message` silently.
+- **Moving an error's status between two property names (`status` ↔ `statusCode`) breaks its readers silently.** Before changing it, find every reader by the error's `code` values and every spelling of the read (casts, destructuring), in service-level catches as well as controllers, plus tests asserting the property. A reader that misses it turns a deliberate 409 into a fallthrough path — a past change turned one into a retryable 502.
 
 ## REQ-GEN-06 — The uniform list contract
 

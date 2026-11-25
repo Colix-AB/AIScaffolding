@@ -1,0 +1,1 @@
+- ✅ **REQ-<PREFIX>-03** — <…> Behind flag `issue-123-<slug>` (remove per [`remove-feature-flag`](../../.claude/skills/remove-feature-flag/SKILL.md) once rolled out).

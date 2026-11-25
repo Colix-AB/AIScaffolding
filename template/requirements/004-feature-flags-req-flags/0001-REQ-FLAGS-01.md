@@ -1,0 +1,1 @@
+- REQ-FLAGS-01: A flag is identified by a lowercase-kebab key, prefixed with the issue number that introduced it.

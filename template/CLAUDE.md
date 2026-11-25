@@ -8,6 +8,10 @@ This file is loaded automatically into every Claude session in this repo. It def
 
 **Assume every bug report and piece of feedback is about production unless the user says otherwise.** A "server restart", crash, or failure the user reports is a production event, not a local dev-server reload — diagnose against the real environment before reaching for a dev-environment explanation.
 
+**Never run a session-level `SET` on a pooled database connection.** If the app reaches its database through a transaction-pooling proxy (`<pgbouncer | RDS Proxy | …>`), a plain `SET` changes a server connection the app shares, and the pooler never resets it. A diagnostic script's `SET default_transaction_read_only = on` once left an environment failing app writes at random for over half an hour. To keep a query read-only, scope it to the transaction: `BEGIN READ ONLY` … `COMMIT` (or `SET LOCAL` inside one).
+
+**Production's operator-edited values live in [`<docs/production-config.md>`](<docs/production-config.md>) — not in the schema defaults, the migration seeds, or a dev database.** Operators edit prices, margins, quotas and limits after they are seeded; a decision reasoned from the seed value is reasoned from a number production stopped using long ago. Keep that snapshot current, reason from it, and re-read production when a decision depends on an exact value.
+
 ---
 
 ## 1. Production-Ready or It Doesn't Get Merged
@@ -20,23 +24,42 @@ This file is loaded automatically into every Claude session in this repo. It def
 
 If a change can't meet all three pillars, **don't add it.** Open an issue describing what's needed first.
 
+**Prove it before the PR: `<npm run preflight>` must end `0 failed`.** It runs the PR CI checks locally, read straight from the workflow files. Checks that are not *required* by branch protection still matter: a red one merges, breaks `main`, and turns every later PR red. A failure you did not cause is proven inherited and named in the PR, never ignored. **After opening a PR and after every push to one, `<npm run pr-verify>` must pass** — a PR that conflicts with its base runs no checks at all, and nothing reports it. See the [`pr-preflight`](.claude/skills/pr-preflight/SKILL.md) skill.
+
 ---
 
-## 2. Functional Changes Update `requirements.md` and `completed.md`
+## 1.5. Every Paid API Call Is Metered — Or It Declares Why Not
 
-The repo ships two paired documents at the root:
+> **Applies only if your product spends money at paid external APIs on a tenant's behalf** (LLM, image, speech, translation, SMS, …). If it doesn't, delete the body but keep the number reserved.
 
-- [`requirements.md`](requirements.md) — the **aspirational spec**. The system's structure, design concepts, and the full set of functional requirements. Intentionally larger than what is shipped today; a living wishlist + design contract.
-- [`completed.md`](completed.md) — the **running ledger of what is actually implemented**. Mirrors the structure of `requirements.md` with ✅ / 🟡 / ❌ markers plus file references and short notes. Source of truth for *shipped* behaviour.
+**Any code path that spends money at a paid external API MUST record that spend against the calling tenant and sit behind a quota gate, unless it is explicitly declared otherwise with a reason.** An unmetered call costs twice: the spend is **unbilled**, and because the quota gate refuses on *recorded* spend, a path that always records zero leaves **the ceiling inert** — the capability is unbounded. And it fails **silently**: "no usage recorded" is indistinguishable from "a cheap month". This has shipped more than once in the project this scaffold came from, each time while the service file documented that callers would meter.
+
+- **Enforced structurally, not by habit.** An invariant test fails when a module reaches a known paid vendor host without being declared. **Do not add your module to its allowlist to make it green** — that is the exact failure the list exists to prevent.
+- **Normalise usage in the wrapper, never in the meter.** A wrapper returning a usage spelling the meter doesn't recognise meters as zero.
+- **Metered but unpriced is still unbounded.** A model with no price row derives zero cost and never trips the ceiling. **Price values are an operator input — never invent one.**
+- **Gate the route.** An endpoint that triggers spend carries the quota gate; an omission is justified inline.
+
+The full contract lives in the [`paid-api-metering`](.claude/skills/paid-api-metering/SKILL.md) skill.
+
+---
+
+## 2. Functional Changes Update `requirements/` and `completed/`
+
+The repo ships two paired documents at the root, each a directory with **one file per entry**:
+
+- [`requirements/`](requirements/) — the **aspirational spec**. The system's structure, design concepts, and the full set of functional requirements. Intentionally larger than what is shipped today; a living wishlist + design contract.
+- [`completed/`](completed/) — the **running ledger of what is actually implemented**. Mirrors the areas of `requirements/` with ✅ / 🟡 / ❌ markers plus file references and short notes. Source of truth for *shipped* behaviour.
+
+Each `##` area is a `NNN-<area>/` directory; each requirement or ledger entry is its own file in it. **A new entry is a new file** — `requirements/<area>/REQ-<ID>.md`, `completed/<area>/<issue>-<slug>.md` — never a line appended to an existing one, so two PRs adding entries cannot conflict. Links inside an entry are relative to its file (`../../src/…`). [`scripts/ledger.mjs`](scripts/ledger.mjs) prints either as one document and `--check` enforces the layout in the lint job. The two READMEs have the details.
 
 ### Workflow
 
 Ship requirements **one at a time**:
 
-1. **Pick one requirement** from `requirements.md` (or scope a new one).
-2. Implement it. If the requirement as written needs to change shape, **edit `requirements.md` first** so the spec and the code agree.
-3. **Update `completed.md`** in the same commit, marking the entry ✅ Done or 🟡 Partial with evidence (file path, test name) and, for 🟡, a one-line gap.
-4. Commit `requirements.md` (if changed) + `completed.md` + the implementation together.
+1. **Pick one requirement** from `requirements/` (or scope a new one).
+2. Implement it. If the requirement as written needs to change shape, **edit its file in `requirements/` first** so the spec and the code agree.
+3. **Update `completed/`** in the same commit: add the entry's file (or edit the existing one), marking it ✅ Done or 🟡 Partial with evidence (file path, test name) and, for 🟡, a one-line gap.
+4. Commit the `requirements/` change (if any) + the `completed/` entry + the implementation together.
 
 ### What counts as a functional change
 
@@ -44,7 +67,7 @@ New endpoints, request/response shapes, status codes; new tables/columns/relatio
 
 **Non-functional changes** (behaviour-preserving refactors, perf tuning, dep upgrades, internal renames, test additions) do not require updates to either doc.
 
-A PR that changes functionality without updating both `requirements.md` (when scope shifts) and `completed.md` is **incomplete**.
+A PR that changes functionality without updating both `requirements/` (when scope shifts) and `completed/` is **incomplete**.
 
 ---
 
@@ -54,7 +77,7 @@ When something needs fixing or extending, change the **one** place that owns the
 
 - **One behaviour, one implementation.** If a capability already exists, extend or fix *it*. Adding a parallel implementation (a second editor, a second renderer, a second client, a duplicated helper) is only acceptable when the two genuinely serve different contracts — and then the difference must be explicit and documented, not incidental.
 - **No feature regressions in the name of cleanup.** Converging two paths onto one is only correct if the surviving path is at least as capable. If the canonical path is missing something the one you're removing had, **add it to the canonical path first**, then remove the duplicate. Dropping functionality to make the diff smaller is the half-measure this rule forbids.
-- **Finish the convergence or track the remainder honestly.** A migration that can't land in one reviewable change is done incrementally — but every step moves toward the single source, never away, and the unfinished remainder is recorded explicitly (a `completed.md` 🟡 entry) so the half-migrated state is visible and owned.
+- **Finish the convergence or track the remainder honestly.** A migration that can't land in one reviewable change is done incrementally — but every step moves toward the single source, never away, and the unfinished remainder is recorded explicitly (a `completed/` 🟡 entry) so the half-migrated state is visible and owned.
 - **Name the divergence when you find one.** If you discover two paths that should be one, the fix is to converge them, not to patch only the path in front of you and leave the other broken-but-different.
 
 A PR that fixes a symptom by adding a second code path where one should exist — or that "unifies" by deleting capability — is **incomplete**.
@@ -104,7 +127,10 @@ Commits and PRs are authored by the human engineer. Write commit messages and PR
 **The canonical worktree directory is the gitignored, project-local `.worktrees/` at the repo root.** Every isolated worktree — `ship-issue`, `ship-issues`, `quick-fix`, `resolve-merge-conflicts`, or a manual `using-git-worktrees` — goes to `.worktrees/<branch>`. Do **not** create worktrees in sibling directories or in a temp dir. This is the preference the `using-git-worktrees` skill reads here; it overrides that skill's "ask the user" fallback.
 
 - **Why one directory.** Worktrees scattered across several homes is how a tree accumulates dozens of stale, half-removed workspaces nobody can reason about. One home makes cleanup a single sweep.
-- **Clean up after the branch lands.** A worktree exists only for the life of its branch. Once its PR is **open** the worktree has done its job (the work is pushed) and should be removed; once the PR is **merged**, delete the local branch too. Removal is `git worktree remove .worktrees/<branch>` followed by `git worktree prune`. On Windows, if a dev server holds a lock, stop that process first; if the directory still won't delete it is already de-registered and gitignored — leave it, don't fight the lock.
+- **Create the worktree with `git worktree add` — not with Claude Code's `EnterWorktree` tool.** A background session's preamble asks you to call `EnterWorktree` before your first edit. Pointed at `.worktrees/<branch>` it relocates the session's permission root out of the tool's own managed directory, so the user is asked to approve it **every single time**, and its only prompt-free alternative is the tool's own `.claude/worktrees/`, which this rule forbids. Nothing is lost by skipping it: the background-isolation guard accepts a path inside any linked git worktree. Isolate by **creating** the worktree and addressing every file by its path inside it.
+- **Harness-managed worktrees are the exception, and you never hand-create them.** Agent isolation (`isolation: "worktree"`), workflow per-agent isolation and `claude --worktree` make their own worktrees under `.claude/worktrees/` and clean them up themselves; that directory belongs to the tool. The rule above governs worktrees *you* create.
+- **Never `git stash` as a baseline trick.** The stash is shared by every worktree of the clone; a stash/pop cycle in one session has swapped uncommitted work with a parallel session's.
+- **Clean up after the branch lands.** A worktree exists only for the life of its branch. It stays while the PR is watched (CI fixes, conflict resolution and review replies run from it); once the PR is **merged or closed**, remove the worktree and delete the local branch. Removal is `git worktree remove .worktrees/<branch>` followed by `git worktree prune`. On Windows, if a dev server holds a lock, stop that process first; if the directory still won't delete it is already de-registered and gitignored — leave it, don't fight the lock.
 - **The primary checkout is the developer's.** Never `git checkout`, `git switch`, or `git stash` in the primary working tree during autonomous work — the developer may be using it. The one exception is the [`iterate-start`](.claude/skills/iterate-start/SKILL.md) pair, which deliberately branches in place *with the developer present*.
 
 ---
@@ -118,6 +144,17 @@ Commits and PRs are authored by the human engineer. Write commit messages and PR
 - **Don't strip the comments other rules require.** The justification comments mandated elsewhere (anonymous-route rationale per `endpoint-security`, copy/skip decisions per `lockstep-contracts`, casing-island notes per `wire-casing`) still belong — write them tight.
 
 The full comment contract lives in the [`code-quality`](.claude/skills/code-quality/SKILL.md) skill.
+
+---
+
+## 6.5. Internal Identifiers Never Reach User-Facing Copy
+
+**Issue numbers (`#N`), requirement ids (`REQ-…`) and internal jargon (service and class names, table, shard or queue names) are our traceability, not product prose. They must never appear in anything a customer or end user reads.**
+
+- **Where they belong.** Source comments, commit messages, `requirements/` / `completed/`, PR descriptions, test names, skill docs.
+- **Where they are forbidden.** UI strings and locale bundles, user docs, marketing pages, email templates, API error messages, release notes, published package or extension metadata.
+- **Write the reason, not the reference.** `"Conversational assistant bound to one of your agents"` — not `"… (REQ-AGENT-04)"`.
+- **Gate it where you can** — a script that fails the PR when published metadata carries an id. A published string carrying an internal id is a defect, and expensive to retract once it ships.
 
 ---
 
@@ -139,11 +176,29 @@ A PR that knowingly lands a stopgap where the real fix was in reach is **incompl
 
 **<HOST A> and <HOST B> are one product rendered twice. Any user-facing change that touches a shared component, layout container, navigation chrome, the event layer, the data clients, or any wire shape MUST hold parity in the SAME PR. Parity is NEVER deferred.**
 
-- **No parity, no ship.** If a parity-affecting feature cannot behave identically (in behaviour, not pixels) on both hosts within the same change, it is **not done**: do not merge it, **do not open a PR**, and do not mark it ✅ in `completed.md`. A 🟡 "parity is a follow-up" entry is **not** an acceptable outcome — it is a blocked feature. This clause overrides the general 🟡-partial allowance in §2 and the "track the remainder" allowance in §3.
+- **No parity, no ship.** If a parity-affecting feature cannot behave identically (in behaviour, not pixels) on both hosts within the same change, it is **not done**: do not merge it, **do not open a PR**, and do not mark it ✅ in `completed/`. A 🟡 "parity is a follow-up" entry is **not** an acceptable outcome — it is a blocked feature. This clause overrides the general 🟡-partial allowance in §2 and the "track the remainder" allowance in §3.
+- **Pick a reference host if one host can do strictly more.** When one host (say a native app) can provide capabilities the other (a browser) genuinely cannot, name it the reference host. A capability may then exist on the reference host alone — but only where the other host *cannot* provide it, and it must (a) name that platform limitation in the code and the `completed/` entry, (b) **degrade visibly** on the other host (a disabled control or an explicit "not available here" state — never a blank render, a silent no-op or a crash), and (c) declare itself through the platform-support metadata the project already has. The reverse direction — a capability on the lesser host only — is never allowed.
+- **"We ran out of time" is not a platform limitation.** Single-host is a claim about the platform, not about the PR. If the second half is merely unbuilt, the feature is unfinished and §7 applies.
+- **Capabilities, not implementations.** A capability implemented by a different library on each host is **full parity**. Single-host means the capability is absent on one host, never merely that the code differs.
+- **Shared plumbing never takes the asymmetry.** Wire shapes, data clients, the event layer, the auth token flow and generated navigation stay in strict lockstep on both hosts, always.
+- **The authoring surface shows what it can't render.** If makers author on the lesser host, a reference-host-only surface renders an explicit placeholder there, so nobody mistakes "not supported here" for "broken".
 - **Both hosts move together.** Change the single source that drives both — the cross-platform component source, the code generator, the shared clients — never patch one host and leave the other behind. The surfaces and the lockstep checklist live in the [`cross-host-parity`](.claude/skills/cross-host-parity/SKILL.md) skill.
 - **Prove it, or you don't have it.** A parity-affecting PR carries the parity evidence: pinned generator/output tests for the second host, and the first host covered at its own level. If you cannot verify parity, you cannot claim it — and per the rule above, you do not ship.
 
 A PR that ships a parity-affecting feature on only one host — or that defers parity to a later change — is **rejected**, not merely incomplete.
+
+---
+
+## 8.6. Major Features Land in the User Docs — in the Same PR
+
+**Every major user-facing feature is described in the user docs (`<docs/manual path>`) in the same PR that ships it.** A feature the docs never mention is invisible to prospects and new users; docs that describe a renamed, moved or removed feature are wrong.
+
+- **Major means a user needs to know it exists:** a new surface or tab, a new or reworked workflow, a new building block or capability — or **any change that makes the current docs wrong**. Bug fixes, refactors, styling, admin surfaces and developer docs are not docs material.
+- **Every written locale moves together**, with the same section and block shape. Figures are generated by a capture spec, never pasted by hand.
+- **Flagged features are documented at release** — in the PR that removes the flag.
+- **Declare it.** Every PR with a user-facing change states `Docs: <chapter → section>` or `Docs: not needed — <reason>`.
+
+The checklist lives in the [`docs-coverage`](.claude/skills/docs-coverage/SKILL.md) skill. A PR that ships a major feature with no docs coverage and no stated reason is **incomplete**.
 
 ---
 
@@ -177,6 +232,16 @@ Skills live in [.claude/skills/](.claude/skills/) and are loaded when their topi
 | [`using-git-worktrees`](.claude/skills/using-git-worktrees/SKILL.md) | Creating an isolated worktree before implementation work. |
 | [`resolve-merge-conflicts`](.claude/skills/resolve-merge-conflicts/SKILL.md) | Resolving the merge conflicts on a `CONFLICTING` PR/branch. Merges the base in inside an isolated worktree, resolves every conflict by intent, sweeps for semantic breakage the auto-merge hid, proves it, pushes, and confirms `MERGEABLE`. |
 | [`pr-maintenance`](.claude/skills/pr-maintenance/SKILL.md) | Scheduled open-PR triage. Resolves trivial conflicts, replies to or pushes small fixes for review comments, and squash-merges approved PRs for a single author login. |
+| [`pr-preflight`](.claude/skills/pr-preflight/SKILL.md) | Before opening or pushing to any PR, and right after. `<npm run preflight>` runs the PR workflows' own commands locally; `<npm run pr-verify>` confirms the PR isn't CONFLICTING and its checks started, then watches it until merge. |
+| [`fix-pr-checks`](.claude/skills/fix-pr-checks/SKILL.md) | An open PR has red checks. Classifies each (caused / inherited / flaky), fixes only the PR's own at the root cause in a worktree, proves it with preflight, loops up to 3 rounds. |
+| [`gh-stack-workflow`](.claude/skills/gh-stack-workflow/SKILL.md) | Shipping a change that depends on unmerged work — creating, restacking or merging a GitHub stack (the mechanics behind §5.5). |
+| [`retrospective`](.claude/skills/retrospective/SKILL.md) | **The closing step of every delivery flow**, and whenever the user corrects how a flow was run. Fixes the one skill that should have prevented each friction (rewrite before add), ships it as its own `quick-fix` PR, logs to `docs/retrospectives/`. |
+| [`fix-nightly-tests`](.claude/skills/fix-nightly-tests/SKILL.md) | The nightly full suite on `main` is red. Classifies each failure (real / load / already fixed / in a PR) and fixes the real ones in one PR. |
+| [`paid-api-metering`](.claude/skills/paid-api-metering/SKILL.md) | Any code that spends money at a paid external API (LLM, image, translation, SMS…) — wrapper, model, call site, quota-gated route, price table (§1.5). |
+| [`docs-coverage`](.claude/skills/docs-coverage/SKILL.md) | Shipping a major user-facing feature, or any change that makes the user docs wrong (§8.6). All locales together, figures generated, PR declares its `Docs:` impact. |
+| [`design-system`](.claude/skills/design-system/SKILL.md) | Building, changing or reviewing any app or admin screen. The shared components, tokens and recorded UI decisions; binding for `frontend-developer` and `ui-ux-designer`. |
+| [`prioritize-ready-issues`](.claude/skills/prioritize-ready-issues/SKILL.md) | Scheduled: gives every `status: ready` issue one `priority:` label, at most 5 highest and 10 high. Writes only priority labels. |
+| [`find-code-smells`](.claude/skills/find-code-smells/SKILL.md) | "Find code smells" / scheduled: files exactly 1 large + 2 small verified, rule-citing smells as `type: chore` issues via `github-issue`. Read-only on code. |
 | [`release-notes`](.claude/skills/release-notes/SKILL.md) | Writing the user-facing "What's New" entry for one release window. Mines what the deploy actually carried from git history and composes one themed entry. |
 
 These skills are **rules, not suggestions.** When in doubt, follow them. When you have a strong reason to deviate, say so in the PR description.
